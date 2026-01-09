@@ -7,6 +7,7 @@ import socket
 import sqlite3
 import time
 import os
+import urllib.request
 from pathlib import Path
 
 # Configuration
@@ -100,7 +101,14 @@ def main():
     
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
-            if os.path.isfile(arg):
+            if arg.startswith(('http://', 'https://')):
+                try:
+                    req = urllib.request.Request(arg, headers={'User-Agent': 'ip2asn/1.0'})
+                    with urllib.request.urlopen(req, timeout=15) as response:
+                        all_text += response.read().decode('utf-8', errors='ignore') + "\n"
+                except Exception as e:
+                    print(f"Error fetching URL {arg}: {e}", file=sys.stderr)
+            elif os.path.isfile(arg):
                 with open(arg, 'r') as f:
                     all_text += f.read() + "\n"
             else:

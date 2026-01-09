@@ -33,6 +33,11 @@ cat sample.txt | ./ip2asn
 ./ip2asn 8.8.8.8 1.1.1.1
 ```
 
+### URL arguments
+```bash
+./ip2asn https://www.egloff.eu/qralocator/viewlogqralocator.php
+```
+
 ### File arguments
 ```bash
 ./ip2asn sample.txt long-sample.txt
