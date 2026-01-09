@@ -116,7 +116,7 @@ def main():
     elif not sys.stdin.isatty():
         all_text = sys.stdin.read()
     else:
-        print("Usage: ./ip2asn [IP or FILE]...", file=sys.stderr)
+        print("Usage: ./ip2asn [IP or FILE] or [URL]...", file=sys.stderr)
         print("Or: cat file | ./ip2asn", file=sys.stderr)
         sys.exit(1)
 
