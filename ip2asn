@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+import sys
+import re
+import socket
+import sqlite3
+import time
+import os
+from pathlib import Path
+
+# Configuration
+CACHE_DIR = Path.home() / ".cache"
+CACHE_FILE = CACHE_DIR / "ip2asn.db"
+CACHE_TTL = 86400  # 24 hours
+BATCH_SIZE = 100
+
+# Regex for IPv4 and IPv6
+IPV4_REGEX = r'\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b'
+IPV6_REGEX = r'\b(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}\b|\b(?:[A-Fa-f0-9]{1,4}:){1,7}:|:(?::[A-Fa-f0-9]{1,4}){1,7}\b|\b(?:[A-Fa-f0-9]{1,4}:){1,6}:[A-Fa-f0-9]{1,4}\b|\b(?:[A-Fa-f0-9]{1,4}:){1,5}(?::[A-Fa-f0-9]{1,4}){1,2}\b|\b(?:[A-Fa-f0-9]{1,4}:){1,4}(?::[A-Fa-f0-9]{1,4}){1,3}\b|\b(?:[A-Fa-f0-9]{1,4}:){1,3}(?::[A-Fa-f0-9]{1,4}){1,4}\b|\b(?:[A-Fa-f0-9]{1,4}:){1,2}(?::[A-Fa-f0-9]{1,4}){1,5}\b|\b[A-Fa-f0-9]{1,4}:(?::[A-Fa-f0-9]{1,4}){1,6}\b'
+
+def init_cache():
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(CACHE_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS cache (
+            ip TEXT PRIMARY KEY,
+            asn TEXT,
+            as_name TEXT,
+            updated_at INTEGER
+        )
+    ''')
+    conn.commit()
+    return conn
+
+def get_cached_ips(conn, ips):
+    if not ips:
+        return {}
+    cursor = conn.cursor()
+    now = int(time.time())
+    placeholders = ','.join(['?'] * len(ips))
+    cursor.execute(f'SELECT ip, asn, as_name FROM cache WHERE ip IN ({placeholders}) AND updated_at > ?', (*ips, now - CACHE_TTL))
+    return {row[0]: (row[1], row[2]) for row in cursor.fetchall()}
+
+def save_to_cache(conn, results):
+    if not results:
+        return
+    cursor = conn.cursor()
+    now = int(time.time())
+    data = [(ip, asn, name, now) for ip, (asn, name) in results.items()]
+    cursor.executemany('INSERT OR REPLACE INTO cache (ip, asn, as_name, updated_at) VALUES (?, ?, ?, ?)', data)
+    conn.commit()
+
+def lookup_ips(ips):
+    results = {}
+    if not ips:
+        return results
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(10)
+            s.connect(("whois.cymru.com", 43))
+            
+            query = "begin\nverbatim\n" + "\n".join(ips) + "\nend\n"
+            s.sendall(query.encode())
+            
+            response = ""
+            while True:
+                data = s.recv(4096)
+                if not data:
+                    break
+                response += data.decode()
+                
+            # Parse response
+            # Format: ASN | IP | AS Name
+            lines = response.splitlines()
+            for line in lines:
+                if "|" not in line or line.startswith("Bulk mode"):
+                    continue
+                parts = [p.strip() for p in line.split("|")]
+                if len(parts) >= 3:
+                    asn = parts[0]
+                    ip = parts[1]
+                    name = parts[2]
+                    results[ip] = (asn, name)
+    except Exception as e:
+        print(f"Error during lookup: {e}", file=sys.stderr)
+        
+    return results
+
+def extract_ips(text):
+    ipv4s = re.findall(IPV4_REGEX, text)
+    ipv6s = re.findall(IPV6_REGEX, text)
+    return set(ipv4s + ipv6s)
+
+def main():
+    conn = init_cache()
+    all_text = ""
+    
+    if len(sys.argv) > 1:
+        for arg in sys.argv[1:]:
+            if os.path.isfile(arg):
+                with open(arg, 'r') as f:
+                    all_text += f.read() + "\n"
+            else:
+                all_text += arg + "\n"
+    elif not sys.stdin.isatty():
+        all_text = sys.stdin.read()
+    else:
+        print("Usage: ./ip2asn [IP or FILE]...", file=sys.stderr)
+        print("Or: cat file | ./ip2asn", file=sys.stderr)
+        sys.exit(1)
+
+    ips = sorted(list(extract_ips(all_text)))
+    if not ips:
+        sys.exit(0)
+
+    cached = get_cached_ips(conn, ips)
+    to_lookup = [ip for ip in ips if ip not in cached]
+    
+    results = cached.copy()
+    
+    # Process in batches
+    for i in range(0, len(to_lookup), BATCH_SIZE):
+        batch = to_lookup[i:i+BATCH_SIZE]
+        new_results = lookup_ips(batch)
+        results.update(new_results)
+        save_to_cache(conn, new_results)
+
+    # Output in original ordered (sorted) IPs
+    for ip in ips:
+        if ip in results:
+            asn, name = results[ip]
+            print(f"{ip} | {asn} | {name}")
+        else:
+            print(f"{ip} | NOT FOUND | -")
+
+if __name__ == "__main__":
+    main()

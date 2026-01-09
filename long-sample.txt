@@ -1,0 +1,30 @@
+This is a long sample file for stress testing and verifying the ip2asn tool.
+It contains many IPs, some duplicates, and some invalid strings.
+
+Google DNS: 8.8.8.8 and 8.8.4.4
+Cloudflare: 1.1.1.1 and 1.0.0.1
+Quad9: 9.9.9.9
+Cisco: 208.67.222.222
+
+IPv6 examples:
+2001:4860:4860::8888
+2606:4700:4700::1111
+2001:4860:4860::8844
+
+More random IPs:
+142.250.190.46 (Google)
+157.240.221.35 (Meta)
+13.224.227.10 (Amazon)
+104.16.123.96 (Cloudflare)
+185.199.108.133 (GitHub)
+140.82.112.4 (GitHub)
+
+Duplicate check:
+8.8.8.8
+1.1.1.1
+2001:4860:4860::8888
+
+Invalid IPs that should be ignored:
+999.999.999.999
+1.2.3.4.5
+2001:db8::g
