@@ -7,7 +7,7 @@ Copyright (c) 2026 John Mueller
 https://github.com/softplus/ip2asn
 
 ## Features
-- Extracts IPv4 and IPv6 addresses from files or standard input.
+- Extracts IPv4 and IPv6 addresses from a URL, files, or standard input.
 - Uses Team Cymru Bulk Whois for fast, free lookups.
 - Local SQLite cache at `~/.cache/ip2asn.db`.
 - 24-hour cache TTL.
