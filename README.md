@@ -2,6 +2,10 @@
 
 A CLI tool to look up ASN and AS Name for IP addresses.
 
+Copyright (c) 2026 John Mueller
+
+https://github.com/softplus/ip2asn
+
 ## Features
 - Extracts IPv4 and IPv6 addresses from files or standard input.
 - Uses Team Cymru Bulk Whois for fast, free lookups.
@@ -46,3 +50,6 @@ Run the provided test files:
 ./ip2asn sample.txt
 ./ip2asn long-sample.txt
 ```
+
+## License
+MIT License - see [LICENSE](LICENSE) for details.
